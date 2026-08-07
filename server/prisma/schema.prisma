@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Provider {
+  GITHUB
+}
+
+enum PullRequestStatus {
+  OPEN
+  CLOSED
+  MERGED
+}
+
+model Repository {
+
+  id         String   @id @default(cuid())
+
+  name       String
+
+  owner      String
+
+  provider   Provider
+
+  createdAt  DateTime @default(now())
+
+  updatedAt  DateTime @updatedAt
+
+  pullRequests PullRequest[]
+
+}
+
+model PullRequest {
+
+  id          String   @id @default(cuid())
+
+  prNumber    Int
+
+  title       String
+
+  status      PullRequestStatus
+
+  repositoryId String
+
+  repository  Repository @relation(fields: [repositoryId], references: [id])
+
+  createdAt   DateTime @default(now())
+
+  updatedAt   DateTime @updatedAt
+
+}

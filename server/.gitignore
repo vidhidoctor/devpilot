@@ -102,3 +102,6 @@ docker-compose.override.yml
 # Package Managers
 # =========================
 .pnpm-store/
+/src/generated/prisma
+
+/src/generated/prisma
