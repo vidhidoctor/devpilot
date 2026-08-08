@@ -1,39 +1,37 @@
+import dotenv from "dotenv";
 import { Worker } from "bullmq";
+
 import { redisConnection } from "../config/redis.js";
 import { AnalysisService } from "../services/analysis.service.js";
 
-const prWorker = new Worker(
+dotenv.config();
 
+const worker = new Worker(
     "pull-request-analysis",
 
     async (job) => {
+        console.log("=================================");
+        console.log("🚀 Processing PR job");
+        console.log("Job ID:", job.id);
+        console.log("Job data:", job.data);
 
-        try {
+        await AnalysisService.analyze(job.data);
 
-            console.log(`🚀 Processing Job ${job.id}`);
-
-            await AnalysisService.analyze(job.data);
-
-            console.log("✅ Job Completed");
-
-        }
-
-        catch(error){
-
-            console.error(error);
-
-            throw error;
-
-        }
-
+        console.log("✅ PR analysis completed");
     },
 
     {
-
         connection: redisConnection
-
     }
-
 );
 
-console.log("✅ PR Worker Started...");
+worker.on("completed", (job) => {
+    console.log(`✅ Job ${job.id} completed`);
+});
+
+worker.on("failed", (job, error) => {
+    console.error(`❌ Job ${job?.id} failed`);
+    console.error(error);
+});
+
+console.log("👷 PR Worker started");
