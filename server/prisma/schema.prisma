@@ -7,50 +7,87 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Provider {
-  GITHUB
-}
-
-enum PullRequestStatus {
-  OPEN
-  CLOSED
-  MERGED
-}
-
 model Repository {
-
-  id         String   @id @default(cuid())
-
-  name       String
-
-  owner      String
-
-  provider   Provider
-
-  createdAt  DateTime @default(now())
-
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  provider  String
+  owner     String
+  name      String
+  fullName  String   @unique
 
   pullRequests PullRequest[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PullRequest {
-
-  id          String   @id @default(cuid())
-
-  prNumber    Int
-
+  id          Int      @id @default(autoincrement())
+  number      Int
   title       String
+  description String?
+  author      String
+  baseBranch  String
+  headBranch  String
+  commitSha   String
+  status      String
 
-  status      PullRequestStatus
+  repositoryId Int
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
-  repositoryId String
+  changedFiles ChangedFile[]
+  analyses     Analysis[]
 
-  repository  Repository @relation(fields: [repositoryId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([repositoryId, number])
+}
+
+model ChangedFile {
+  id         Int     @id @default(autoincrement())
+  filename   String
+  status     String
+  additions  Int
+  deletions  Int
+  changes    Int
+  patch      String?
+
+  pullRequestId Int
+  pullRequest   PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
+  findings Finding[]
+
+  createdAt DateTime @default(now())
+}
+
+model Analysis {
+  id            Int      @id @default(autoincrement())
+  status        String
+  summary       String?
+
+  pullRequestId Int
+  pullRequest   PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
+
+  findings Finding[]
 
   createdAt   DateTime @default(now())
+  completedAt DateTime?
+}
 
-  updatedAt   DateTime @updatedAt
+model Finding {
+  id         Int     @id @default(autoincrement())
+  severity   String
+  category   String?
+  title      String
+  message    String
+  suggestion String?
+  lineNumber Int?
 
+  analysisId Int
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  changedFileId Int?
+  changedFile   ChangedFile? @relation(fields: [changedFileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
