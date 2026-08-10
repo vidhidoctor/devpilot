@@ -1,27 +1,40 @@
+import { LLMService } from "../services/llm.service.js";
+
 export class CodeAnalyzer {
 
-    static analyzeFile(file) {
+    static async analyze(files) {
 
-        const findings = [];
+        const allFindings = [];
 
-        const patch = file.patch;
+        for (const file of files) {
 
-        if (!patch) {
-            return findings;
+            // Skip files without a textual patch
+            if (!file.patch) {
+                console.log(
+                    ` Skipping ${file.filename} - no patch available`
+                );
+
+                continue;
+            }
+
+            console.log(
+                ` Analyzing ${file.filename}`
+            );
+
+            const result =
+                await LLMService.reviewCode({
+                    filename: file.filename,
+                    patch: file.patch
+                });
+
+            allFindings.push(
+                ...result.findings.map((finding) => ({
+                    ...finding,
+                    filename: file.filename
+                }))
+            );
         }
 
-        // Rule 1: Detect console.log()
-        if (patch.includes("console.log")) {
-
-            findings.push({
-                severity: "low",
-                category: "code-quality",
-                title: "Console statement detected",
-                message: "Avoid leaving console.log statements in production code.",
-                suggestion: "Remove the console.log or replace it with a proper logging mechanism."
-            });
-        }
-
-        return findings;
+        return allFindings;
     }
 }

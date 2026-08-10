@@ -7,6 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AnalysisStatus {
+  pending
+  running
+  completed
+  failed
+}
+
 model Repository {
   id        Int      @id @default(autoincrement())
   provider  String
@@ -61,8 +68,8 @@ model ChangedFile {
 }
 
 model Analysis {
-  id            Int      @id @default(autoincrement())
-  status        String
+  id            Int           @id @default(autoincrement())
+  status        AnalysisStatus @default(pending)
   summary       String?
 
   pullRequestId Int
