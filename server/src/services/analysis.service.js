@@ -6,7 +6,8 @@ export class AnalysisService {
 
     static async analyze(jobData) {
 
-        let analysis;
+        let analysis = null;
+        let savedPullRequest = null;
 
         try {
 
@@ -25,19 +26,6 @@ export class AnalysisService {
             const pullRequest =
                 await provider.getPullRequest(jobData);
 
-
-            // ==========================================
-            // 3. Get changed files from GitHub
-            // ==========================================
-
-            const files =
-                await provider.getPullRequestFiles(jobData);
-
-
-            // ==========================================
-            // 4. Display PR information
-            // ==========================================
-
             console.log("========== PR ==========");
 
             console.log({
@@ -48,7 +36,7 @@ export class AnalysisService {
 
 
             // ==========================================
-            // 5. Find or create repository
+            // 3. Find or create repository
             // ==========================================
 
             const repository =
@@ -72,10 +60,10 @@ export class AnalysisService {
 
 
             // ==========================================
-            // 6. Find or create Pull Request
+            // 4. Find or create Pull Request
             // ==========================================
 
-            const savedPullRequest =
+            savedPullRequest =
                 await prisma.pullRequest.upsert({
 
                     where: {
@@ -110,6 +98,48 @@ export class AnalysisService {
 
 
             // ==========================================
+            // 5. Check whether this commit was already analyzed
+            // ==========================================
+
+            const existingAnalysis =
+                await prisma.analysis.findUnique({
+
+                    where: {
+                        pullRequestId_commitSha: {
+                            pullRequestId:
+                                savedPullRequest.id,
+
+                            commitSha:
+                                jobData.commitSha
+                        }
+                    }
+                });
+
+
+            if (existingAnalysis) {
+
+                console.log(
+                    `⏭️ Analysis already exists for PR #${pullRequest.number} and commit ${jobData.commitSha}`
+                );
+
+                return;
+            }
+
+
+            // ==========================================
+            // 6. Get changed files from GitHub
+            // ==========================================
+
+            const files =
+                await provider.getPullRequestFiles(jobData);
+
+
+            console.log(
+                `📁 ${files.length} changed files found`
+            );
+
+
+            // ==========================================
             // 7. Save current changed files
             // ==========================================
 
@@ -122,21 +152,24 @@ export class AnalysisService {
             });
 
 
-            await prisma.changedFile.createMany({
+            if (files.length > 0) {
 
-                data: files.map((file) => ({
+                await prisma.changedFile.createMany({
 
-                    filename: file.filename,
-                    status: file.status,
-                    additions: file.additions,
-                    deletions: file.deletions,
-                    changes: file.changes,
-                    patch: file.patch || null,
+                    data: files.map((file) => ({
 
-                    pullRequestId:
-                        savedPullRequest.id
-                }))
-            });
+                        filename: file.filename,
+                        status: file.status,
+                        additions: file.additions,
+                        deletions: file.deletions,
+                        changes: file.changes,
+                        patch: file.patch || null,
+
+                        pullRequestId:
+                            savedPullRequest.id
+                    }))
+                });
+            }
 
 
             // ==========================================
@@ -149,10 +182,14 @@ export class AnalysisService {
                     data: {
                         status: "running",
 
+                        commitSha:
+                            jobData.commitSha,
+
                         pullRequestId:
                             savedPullRequest.id
                     }
                 });
+
 
             console.log(
                 "🔍 Analysis started:",
@@ -161,11 +198,12 @@ export class AnalysisService {
 
 
             // ==========================================
-            // 9. Run CodeAnalyzer
+            // 9. Run Code Analyzer
             // ==========================================
 
             const findings =
                 await CodeAnalyzer.analyze(files);
+
 
             console.log(
                 `🤖 ${findings.length} findings detected`
@@ -200,7 +238,7 @@ export class AnalysisService {
 
 
             // ==========================================
-            // 12. Attach database IDs to findings
+            // 12. Prepare findings
             // ==========================================
 
             const findingsToSave =
@@ -228,7 +266,9 @@ export class AnalysisService {
                         analysis.id,
 
                     changedFileId:
-                        fileMap.get(finding.filename) ?? null
+                        fileMap.get(
+                            finding.filename
+                        ) ?? null
                 }));
 
 
@@ -304,8 +344,9 @@ export class AnalysisService {
             );
 
 
-            // If an analysis was created,
-            // mark it as failed.
+            // ==========================================
+            // Mark analysis as failed
+            // ==========================================
 
             if (analysis) {
 
@@ -322,8 +363,28 @@ export class AnalysisService {
             }
 
 
-            // Important:
-            // Let BullMQ know the job failed.
+            // ==========================================
+            // Mark PR as failed
+            // ==========================================
+
+            if (savedPullRequest) {
+
+                await prisma.pullRequest.update({
+
+                    where: {
+                        id: savedPullRequest.id
+                    },
+
+                    data: {
+                        status: "failed"
+                    }
+                });
+            }
+
+
+            // ==========================================
+            // Let BullMQ handle the failure/retry
+            // ==========================================
 
             throw error;
         }

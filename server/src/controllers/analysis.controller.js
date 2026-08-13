@@ -65,6 +65,7 @@ export const getAnalysisById = async (req, res) => {
       analysis: {
         id: analysis.id,
         status: analysis.status,
+        commitSha: analysis.commitSha,
         createdAt: analysis.createdAt,
         completedAt: analysis.completedAt
       },
@@ -130,6 +131,7 @@ export const getAnalyses = async (req, res) => {
       return {
         id: analysis.id,
         status: analysis.status,
+        commitSha: analysis.commitSha,
         createdAt: analysis.createdAt,
         completedAt: analysis.completedAt,
 

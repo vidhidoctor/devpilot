@@ -14,6 +14,12 @@ enum AnalysisStatus {
   failed
 }
 
+enum PullRequestStatus {
+  analyzing
+  analyzed
+  failed
+}
+
 model Repository {
   id        Int      @id @default(autoincrement())
   provider  String
@@ -36,7 +42,7 @@ model PullRequest {
   baseBranch  String
   headBranch  String
   commitSha   String
-  status      String
+  status PullRequestStatus @default(analyzing)
 
   repositoryId Int
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
@@ -48,6 +54,7 @@ model PullRequest {
   updatedAt DateTime @updatedAt
 
   @@unique([repositoryId, number])
+  @@index([repositoryId])
 }
 
 model ChangedFile {
@@ -65,12 +72,14 @@ model ChangedFile {
   findings Finding[]
 
   createdAt DateTime @default(now())
+  @@index([pullRequestId])
 }
 
 model Analysis {
-  id            Int           @id @default(autoincrement())
-  status        AnalysisStatus @default(pending)
-  summary       String?
+  id           Int            @id @default(autoincrement())
+  status       AnalysisStatus @default(pending)
+  summary      String?
+  commitSha     String         @default("unknown")
 
   pullRequestId Int
   pullRequest   PullRequest @relation(fields: [pullRequestId], references: [id], onDelete: Cascade)
@@ -79,6 +88,9 @@ model Analysis {
 
   createdAt   DateTime @default(now())
   completedAt DateTime?
+
+  @@unique([pullRequestId, commitSha])
+  @@index([pullRequestId])
 }
 
 model Finding {
@@ -97,4 +109,6 @@ model Finding {
   changedFile   ChangedFile? @relation(fields: [changedFileId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  @@index([analysisId])
+  @@index([changedFileId])
 }
